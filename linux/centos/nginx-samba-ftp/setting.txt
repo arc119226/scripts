@@ -1,0 +1,184 @@
+nginx,vsftp,samba in centos 7 in azure 
+
+case insensitive (like window style)
+
+create a centos 7
+
+step 0 nsg setting
+22 TCP allow any
+80 TCP allow any
+137 UDPallow any
+138 UDP allow any
+139 TCP allow any
+443 TCP allow any
+445 TCP/UDP allow any
+2188 TCP allow any
+10090-10100 TCP allow any
+
+step 1 install samba
+    sudo -s
+    yum remove samba samba-client samba-common cifs-utils -y
+    yum install samba samba-client samba-common cifs-utils -y
+    useradd smb_user
+    groupadd smbgrp
+    usermod -a -G smbgrp smb_user
+    smbpasswd -a smb_user
+    #account:smb_user,pw:1234
+
+    mkdir /home/share_dir
+    chown -hR smb_user:smbgrp /home/share_dir
+    chmod -R 0770 /home/share_dir
+    systemctl restart smb
+
+    /etc/samba/smb.conf
+    #set in [global]
+    workgroup = MYGROUP
+    server string = Samba Server Version %v
+    netbios name = centos_7
+	
+    case sensitive = no
+    default case = lower
+    preserve case = no
+    short preserve case = no
+
+    #add [Data] folder
+    path = /home/share_dir
+    valid users = @smbgrp
+    guest ok = no
+    writable = yes
+    browsable = yes
+
+    mkdir /var/webhome
+    vi /etc/sysconfig/selinux
+    SELINUX=enforcing -> SELINUX=disabled
+    //reboot
+    mount.cifs -o username="smb_user",password="1234" //localhost/Data/webhome /var/webhome
+
+
+step 2 install vsftp
+    yum remove vsftpd ftp -y
+    yum install vsftpd ftp -y
+
+    vim /etc/vsftpd/vsftpd.conf
+
+    anonymous_enable=YES
+    local_enable=YES
+    write_enable=YES
+    local_umask=022
+    dirmessage_enable=YES
+    xferlog_enable=YES
+    xferlog_file=/var/log/xferlog
+    xferlog_std_format=YES
+    ascii_upload_enable=YES
+    ascii_download_enable=YES
+    chroot_local_user=NO
+    chroot_list_enable=YES
+    chroot_list_file=/etc/vsftpd/vsftpd.chroot_list
+    chroot_local_user=YES
+    listen=NO
+    listen_ipv6=YES
+    use_localtime=YES
+    pam_service_name=vsftpd
+    tcp_wrappers=YES
+    pasv_enable=YES
+    pasv_max_port=10100
+    pasv_min_port=10090
+    pasv_addr_resolve=YES
+    listen_port=2188
+
+    chmod a-w /home/share_dir/webhome/userImages
+    chmod a-w /home/share_dir/webhome/Images
+    chmod a-w /home/share_dir/webhome
+    
+   useradd -g smbgrp -d /home/share_dir/webhome/userImages user01
+    useradd -g smbgrp -d /home/share_dir/webhome/Images user02
+    useradd -g smbgrp -d /home/share_dir/webhome/Images user03
+    useradd -g smbgrp -d /home/share_dir/webhome user04
+
+    passwd user01 / 1234
+    passwd user02 / 2234
+    passwd user03 / 3234
+    passwd user04 / 4234 
+    systemctl status vsftpd.service
+
+step 2 install nginx
+    yum install epel-release -y
+    yum install nginx -y
+    systemctl start nginx
+
+
+# For more information on configuration, see:
+#   * Official English Documentation: http://nginx.org/en/docs/
+#   * Official Russian Documentation: http://nginx.org/ru/docs/
+
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile            off;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 2048;
+
+    include             /etc/nginx/mime.types;
+    include             /etc/nginx/proxy.conf;
+    default_type        application/octet-stream;
+
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
+
+}
+
+
+server {
+        listen       80;
+        server_name  _;
+        charset utf-8;
+        access_log  off;
+        error_log off;
+        location / {
+                root   /var/webhome/;
+                index  index.html index.htm;
+        }
+        location ~ /\.ht {
+            deny  all;
+        }
+}
+server {
+        listen       443 ssl;
+        server_name  _;
+        ssl        on;
+        ssl_certificate         /etc/nginx/ssl/cert.pem;
+        ssl_certificate_key     /etc/nginx/ssl/cert.key;
+        access_log off;
+        location / {
+                root   /var/webhome/;
+                index  index.html index.htm;
+        }
+        error_page 403 404 500 503 504 /50x.html;
+        location = /50x.html {
+                return 404;
+        }
+        location ~ /\.ht {
+                deny  all;
+        }
+}

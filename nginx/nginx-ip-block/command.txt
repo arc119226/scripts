@@ -1,0 +1,1 @@
+perl geo2nginx.pl < GeoIPCountryWhois.csv > geo.conf
