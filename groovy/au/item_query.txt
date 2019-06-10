@@ -1,0 +1,166 @@
+@Grab('org.apache.poi:poi:3.9')
+@Grab('org.apache.xmlbeans:xmlbeans:2.3.0')
+@Grab('mysql:mysql-connector-java:5.1.39')
+@Grapes(
+	@Grab(group='net.sourceforge.jtds', module='jtds', version='1.3.1')   
+)
+@GrabConfig(systemClassLoader=true)
+import groovy.sql.Sql
+import org.apache.poi.ss.usermodel.Cell
+import org.apache.poi.ss.usermodel.Row
+import org.apache.poi.ss.usermodel.Sheet
+import org.apache.poi.ss.usermodel.Workbook
+import org.apache.poi.hssf.usermodel.HSSFWorkbook
+def drivers =['mysql':'com.mysql.jdbc.Driver',
+              'mssql':'net.sourceforge.jtds.jdbc.Driver']
+def jdbcs =['happycode':'jdbc:mysql://10.1.5.46:3306/happycode?useUnicode=yes&characterEncoding=UTF-8&character_set_server=utf8mb4',
+			 '12sky2':'jdbc:jtds:sqlserver://10.1.4.2:1433;databaseName=ACCOUNT2',
+			 'audition_item':'jdbc:mysql://10.1.18.17:3306/itemdb?autoreconnect=true&useUnicode=yes&characterEncoding=big5&character_set_server=big5',]
+def user='happycode'
+def pass='jcej0j;3!@#'
+
+def dbtype='mysql'
+def jdbctype='audition_item' //happycode,12sky2,audition_item
+
+def sheet1_sql=
+"""
+-- sheet 1
+select UserSN as 'id' ,
+		 concat(itemID) as 'hair',
+		 concat('     ') as 'jacket',
+		 concat('     ') as 'pants',
+		 concat('     ') as 'shoes'
+from avatar_inventory_hair where ItemID in ('30847') and ExpiredType=4
+union 
+select UserSN,
+		 concat('     ') as 'hair',
+		 concat(itemID) as 'jacket',
+		 concat('     ') as 'pants',
+		 concat('     ') as 'shoes'
+from avatar_inventory_sets where ItemID in ('30812') and ExpiredType=4
+union
+select UserSN,
+		 concat('     ') as 'hair',
+		 concat('     ') as 'jacket',
+		 concat(itemID) as 'pants',
+		 concat('     ') as 'shoes'
+from avatar_inventory_hair where ItemID in ('30811') and ExpiredType=4
+union
+select UserSN,
+		 concat('     ') as 'hair',
+		 concat('     ') as 'jacket',
+		 concat('     ') as 'pants',
+		 concat(itemID) as 'shoes'
+from avatar_inventory_shoes where ItemID in ('286840') and ExpiredType=4
+
+"""
+def sheet2_sql=
+"""
+-- sheet 2
+select UserSN as 'id' ,
+		 concat(itemID) as 'hair',
+		 concat('     ') as 'jacket',
+		 concat('     ') as 'pants',
+		 concat('     ') as 'shoes'
+from avatar_inventory_hair where ItemID in ('30839') and ExpiredType=4 
+union 
+select UserSN,
+		 concat('     ') as 'hair',
+		 concat(itemID) as 'jacket',
+		 concat('     ') as 'pants',
+		 concat('     ') as 'shoes'
+from avatar_inventory_sets where ItemID in ('30809') and ExpiredType=4
+union
+select UserSN,
+		 concat('     ') as 'hair',
+		 concat('     ') as 'jacket',
+		 concat(itemID) as 'pants',
+		 concat('     ') as 'shoes'
+from avatar_inventory_hair where ItemID in ('30808') and ExpiredType=4
+union
+select UserSN,
+		 concat('     ') as 'hair',
+		 concat('     ') as 'jacket',
+		 concat('     ') as 'pants',
+		 concat(itemID) as 'shoes'
+from avatar_inventory_shoes where ItemID in ('286840') and ExpiredType=4
+"""
+def sheet3_sql=
+""" 
+-- sheet 3
+select UserSN as 'id',
+		   concat(itemID) as 'hand'
+from avatar_inventory_hand where ItemID in ('291310') and ExpiredType=4 
+
+"""
+
+for(def i=1;i<=3;i++){
+	def sheet_index=i
+	def userSet=new HashSet<String>()
+	def userhair=new HashMap<String,String>()
+	def userjacket=new HashMap<String,String>()
+	def userpants=new HashMap<String,String>()
+	def userSets=new HashMap<String,String>()
+	def userShoes=new HashMap<String,String>()
+	def userWing=new HashMap<String,String>()
+	def file=new File('sheet'+sheet_index+'.csv');
+	println sheet_index
+	def sql = Sql.newInstance(jdbcs.get(jdbctype),user,pass,drivers.get(dbtype))
+	if(sheet_index==1){
+				sql.eachRow(sheet1_sql){ 
+			userSet.add(it.id)
+			if(it.hair){
+				userhair.put(it.id,it.hair)
+			}else if(it.shoes){
+				userShoes.put(it.id,it.shoes)
+			}else if(it.jacket){
+				userjacket.put(it.id,it.jacket)
+			}else if(it.pants){
+				userpants.put(it.id,it.pants)
+			}
+		}
+		file << 'id,hair,jacket,pants,shoes\r\n'
+		userSet.each{
+			file << it+','+
+					(userhair.get(it)?userhair.get(it):'')+','+
+					(userjacket.get(it)?userjacket.get(it):'')+','+
+					(userpants.get(it)?userpants.get(it):'')+','+
+					(userShoes.get(it)?userShoes.get(it):'')+'\r\n'
+
+		}
+	}else if(sheet_index==2){
+		sql.eachRow(sheet2_sql){ 
+			userSet.add(it.id)
+			if(it.hair){
+				userhair.put(it.id,it.hair)
+			}else if(it.shoes){
+				userShoes.put(it.id,it.shoes)
+			}else if(it.jacket){
+				userjacket.put(it.id,it.jacket)
+			}else if(it.pants){
+				userpants.put(it.id,it.pants)
+			}
+		}
+		file << 'id,hair,jacket,pants,shoes\r\n'
+		userSet.each{
+			file << it+','+
+					(userhair.get(it)?userhair.get(it):'')+','+
+					(userjacket.get(it)?userjacket.get(it):'')+','+
+					(userpants.get(it)?userpants.get(it):'')+','+
+					(userShoes.get(it)?userShoes.get(it):'')+'\r\n'
+
+		}
+	}else if(sheet_index==3){
+		sql.eachRow(sheet3_sql){ 
+			userSet.add(it.id)
+			if(it.hand){
+				userWing.put(it.id,it.hand)
+			}
+		}
+		file << 'id,hand\r\n'
+		userSet.each{
+			file << it+','+(userWing.get(it)?userWing.get(it):'')+'\r\n'
+		}
+	}
+	sql.close()
+}
