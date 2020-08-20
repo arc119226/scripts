@@ -1,0 +1,8 @@
+1. 
+
+create table if not exists new_user select * from user; -- exclude index
+
+2.
+
+create table new_user like user; -- create empty table include index
+insert into new_user select * from user; -- import data
